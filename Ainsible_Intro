@@ -1,0 +1,4014 @@
+Absolutely. Below is a **from-the-ground-up reference guide** based on everything you've been doing. I'll explain it as if you're coming from a non-IT background, then gradually connect the pieces into the bigger picture.
+
+# 1. The big picture first
+
+You're currently working with several different systems at once. This is the most important thing to understand.
+
+Think of your setup as a small company:
+
+```text
+                         INTERNET
+                            │
+                            │
+                    ┌───────▼────────┐
+                    │    GitHub      │
+                    │ Stores your    │
+                    │ code/repo      │
+                    └───────▲────────┘
+                            │
+                       git push/pull
+                            │
+                            │
+┌───────────────────────────┴─────────────────────────────┐
+│                    YOUR CONTROL NODE                    │
+│                                                         │
+│ Linux                                                    │
+│ ├── Terminal / Shell                                     │
+│ ├── Git                                                  │
+│ ├── SSH keys                                             │
+│ ├── Ansible                                              │
+│ └── your ica0002 repository                              │
+│                                                         │
+│ ~/ica0002/                                               │
+│ ├── ansible.cfg                                          │
+│ ├── hosts                                                │
+│ ├── infra.yaml                                           │
+│ ├── roles/                                               │
+│ │   ├── init/                                            │
+│ │   └── nginx/                                           │
+│ └── run-tests.sh                                         │
+└───────────────────────────┬─────────────────────────────┘
+                            │
+                         SSH │
+                            │
+                            ▼
+                ┌──────────────────────┐
+                │    MANAGED HOST      │
+                │       / VM           │
+                │                      │
+                │ Ubuntu Linux         │
+                │ ├── users            │
+                │ ├── SSH server       │
+                │ ├── APT              │
+                │ └── Nginx            │
+                └──────────────────────┘
+```
+
+There are **three particularly important environments** here:
+
+1. **Your control node** — where you type commands and run Ansible.
+2. **The managed host / VM** — the remote Ubuntu machine that Ansible configures.
+3. **GitHub** — where your code is stored and where teachers check your work.
+
+Understanding which machine you're currently operating on is probably the single most important beginner skill.
+
+---
+
+# 2. What is Linux?
+
+Linux is an operating system, just like:
+
+* Windows
+* macOS
+* Android
+
+More precisely, **Linux is the kernel**, the central component that communicates with hardware and manages processes, memory, networking, etc.
+
+When people say "Linux" conversationally, they usually mean an entire operating system built around the Linux kernel.
+
+You are using **Ubuntu**, which is a Linux distribution.
+
+Think:
+
+```text
+Linux kernel
+     +
+system software
+     +
+package manager
+     +
+utilities
+     +
+desktop/server software
+     =
+Linux distribution
+```
+
+Ubuntu is one such distribution.
+
+Your VM is running Ubuntu.
+
+---
+
+# 3. What is a VM?
+
+VM = **Virtual Machine**.
+
+Imagine you have one physical computer:
+
+```text
+Physical computer
+└── Linux/Windows/macOS
+```
+
+Software can pretend that another computer exists inside it:
+
+```text
+Physical computer
+└── Virtual Machine
+    └── Ubuntu
+```
+
+The VM gets things such as:
+
+* CPU
+* RAM
+* disk
+* network interface
+* operating system
+
+as if it were another computer.
+
+For your course, your teachers provision a VM for you.
+
+You connect to it over the network:
+
+```text
+your machine
+     │
+     │ SSH
+     ▼
+193.40.157.25:11722
+     │
+     ▼
+your Ubuntu VM
+```
+
+---
+
+# 4. What is the control node?
+
+The **control node** is the machine from which you run Ansible.
+
+You have been working in:
+
+```text
+/home/dellsisko/ica0002
+```
+
+on your control machine.
+
+When you run:
+
+```bash
+ansible-playbook infra.yaml
+```
+
+you're saying:
+
+> "From this computer, use Ansible to connect to my managed machines and configure them."
+
+The control node contains:
+
+```text
+Ansible
+SSH keys
+Git
+your repository
+your playbooks
+your inventory
+```
+
+---
+
+# 5. What is the managed host?
+
+The managed host is the remote machine Ansible operates on.
+
+In your case:
+
+```text
+Sjinkwe-1
+```
+
+with something like:
+
+```text
+IP:   193.40.157.25
+Port: 11722
+User: ubuntu
+```
+
+Ansible connects to it over SSH.
+
+You don't normally sit inside the VM typing every configuration command manually.
+
+Instead:
+
+```text
+You
+ │
+ │ ansible-playbook
+ ▼
+Ansible
+ │
+ │ SSH
+ ▼
+Ubuntu VM
+```
+
+---
+
+# 6. What is SSH?
+
+SSH = **Secure Shell**.
+
+It lets you securely connect to another computer over a network.
+
+For example:
+
+```bash
+ssh -p 11722 ubuntu@193.40.157.25
+```
+
+Breakdown:
+
+```text
+ssh
+│
+└── program used to make an SSH connection
+
+-p 11722
+│
+└── use port 11722
+
+ubuntu
+│
+└── login as the ubuntu user
+
+@
+│
+└── "at"
+
+193.40.157.25
+│
+└── remote machine's IP address
+```
+
+So:
+
+> Connect to the machine at `193.40.157.25`, using SSH port `11722`, and log in as `ubuntu`.
+
+---
+
+# 7. What is a port?
+
+An IP address identifies a machine.
+
+A **port** identifies a particular network service on that machine.
+
+Think of an apartment building:
+
+```text
+IP address = building
+Port = apartment
+```
+
+For example:
+
+```text
+193.40.157.25:11722
+```
+
+means:
+
+```text
+machine = 193.40.157.25
+service entry point = 11722
+```
+
+SSH normally uses port 22, but your course VM uses a different externally exposed port.
+
+Nginx normally uses:
+
+```text
+port 80
+```
+
+So you can have:
+
+```text
+193.40.157.25:11722
+        │
+        └── SSH
+
+VM:80
+  │
+  └── Nginx / HTTP
+```
+
+---
+
+# 8. SSH authentication: passwords vs keys
+
+SSH can authenticate you using a password or cryptographic keys.
+
+Your course uses **SSH key authentication**.
+
+You have two related files:
+
+```text
+~/.ssh/id_ed25519
+~/.ssh/id_ed25519.pub
+```
+
+The important distinction:
+
+```text
+id_ed25519
+    ↓
+PRIVATE KEY
+KEEP SECRET
+
+id_ed25519.pub
+    ↓
+PUBLIC KEY
+Can be shared
+```
+
+Think of it like:
+
+```text
+Private key = your secret physical key
+
+Public key = the lock that recognizes that key
+```
+
+The public key can be placed on a server.
+
+The private key stays on your control machine.
+
+---
+
+# 9. What is `~`?
+
+You'll see:
+
+```bash
+~/.ssh
+```
+
+The `~` means:
+
+> Your home directory.
+
+For your user, something like:
+
+```text
+~
+└── /home/dellsisko
+```
+
+Therefore:
+
+```text
+~/.ssh
+```
+
+means:
+
+```text
+/home/dellsisko/.ssh
+```
+
+And:
+
+```text
+~/.ssh/id_ed25519
+```
+
+means:
+
+```text
+/home/dellsisko/.ssh/id_ed25519
+```
+
+---
+
+# 10. Linux filesystem structure
+
+Linux has one giant filesystem starting at:
+
+```text
+/
+```
+
+This is called the **root directory**.
+
+Not to be confused with the `root` user.
+
+Typical structure:
+
+```text
+/
+├── home/
+├── etc/
+├── usr/
+├── var/
+├── tmp/
+├── bin/
+├── sbin/
+└── ...
+```
+
+Some important directories:
+
+### `/home`
+
+Normal users' home directories:
+
+```text
+/home/
+└── dellsisko/
+```
+
+### `/etc`
+
+System configuration:
+
+```text
+/etc/
+```
+
+For example, SSH configuration lives around:
+
+```text
+/etc/ssh/
+```
+
+### `/usr`
+
+Programs, libraries and other system resources.
+
+### `/var`
+
+Frequently changing data such as:
+
+* logs
+* caches
+* application data
+
+### `/tmp`
+
+Temporary files.
+
+---
+
+# 11. Files vs directories
+
+This caused an important problem for you earlier.
+
+A **directory** is basically a folder.
+
+A **file** contains data.
+
+You accidentally created:
+
+```text
+main.yaml/
+```
+
+as a directory instead of:
+
+```text
+main.yaml
+```
+
+You discovered this using:
+
+```bash
+ls -la
+```
+
+The first character tells you the type.
+
+```text
+drwxr-xr-x
+```
+
+starts with:
+
+```text
+d
+```
+
+meaning:
+
+> directory
+
+Whereas:
+
+```text
+-rw-r--r--
+```
+
+starts with:
+
+```text
+-
+```
+
+meaning:
+
+> regular file
+
+This distinction is extremely useful.
+
+---
+
+# 12. Navigating Linux directories
+
+## `pwd`
+
+Print Working Directory.
+
+```bash
+pwd
+```
+
+Means:
+
+> Where am I?
+
+Example:
+
+```text
+/home/dellsisko/ica0002
+```
+
+This is one of the best commands to use when you're confused.
+
+---
+
+## `ls`
+
+List directory contents.
+
+```bash
+ls
+```
+
+Example:
+
+```text
+ansible.cfg
+hosts
+infra.yaml
+roles
+```
+
+---
+
+## `ls -l`
+
+Long format:
+
+```bash
+ls -l
+```
+
+Shows:
+
+* permissions
+* owner
+* group
+* size
+* modification time
+* name
+
+---
+
+## `ls -la`
+
+Long format + hidden files:
+
+```bash
+ls -la
+```
+
+`-l`:
+
+```text
+long format
+```
+
+`-a`:
+
+```text
+all, including hidden files
+```
+
+---
+
+# 13. `cd`
+
+Change Directory.
+
+```bash
+cd roles
+```
+
+Now you're inside:
+
+```text
+roles/
+```
+
+Go deeper:
+
+```bash
+cd nginx
+```
+
+Go back one level:
+
+```bash
+cd ..
+```
+
+The `..` means:
+
+> parent directory
+
+Go home:
+
+```bash
+cd ~
+```
+
+Or simply:
+
+```bash
+cd
+```
+
+Go to the root filesystem:
+
+```bash
+cd /
+```
+
+---
+
+# 14. Relative vs absolute paths
+
+This is extremely important.
+
+Suppose you're here:
+
+```text
+/home/dellsisko/ica0002
+```
+
+This is a **relative path**:
+
+```bash
+roles/nginx/tasks/main.yaml
+```
+
+It means:
+
+> Starting from where I currently am, go into `roles`, then `nginx`, then `tasks`.
+
+An **absolute path** starts from `/`:
+
+```bash
+/home/dellsisko/ica0002/roles/nginx/tasks/main.yaml
+```
+
+It means:
+
+> Start at the root of the filesystem and follow the complete path.
+
+---
+
+# 15. Creating directories
+
+You used:
+
+```bash
+mkdir roles/nginx/tasks
+```
+
+`mkdir` means:
+
+> make directory.
+
+But if parent directories don't exist, use:
+
+```bash
+mkdir -p roles/nginx/tasks
+```
+
+`-p` means:
+
+> Create missing parent directories too.
+
+For example:
+
+```bash
+mkdir -p roles/nginx/tasks
+```
+
+can create:
+
+```text
+roles/
+└── nginx/
+    └── tasks/
+```
+
+even if none of them existed.
+
+---
+
+# 16. `mkdir` syntax
+
+The general pattern is:
+
+```text
+command [options] arguments
+```
+
+For:
+
+```bash
+mkdir -p -v test
+```
+
+you have:
+
+```text
+mkdir
+ │
+ ├── -p
+ ├── -v
+ │
+ └── test
+```
+
+`-p`:
+
+> create parents
+
+`-v`:
+
+> verbose — tell me what you're doing
+
+You can sometimes combine options:
+
+```bash
+mkdir -pv test
+```
+
+which is equivalent to:
+
+```bash
+mkdir -p -v test
+```
+
+---
+
+# 17. Creating files
+
+There are several ways.
+
+## `nano`
+
+```bash
+nano roles/nginx/tasks/main.yaml
+```
+
+opens the file in the Nano text editor.
+
+If it doesn't exist, Nano can create it.
+
+---
+
+## `touch`
+
+```bash
+touch example.txt
+```
+
+creates an empty file if it doesn't exist.
+
+---
+
+# 18. Nano basics
+
+At the bottom of Nano you'll see things like:
+
+```text
+^O Write Out
+^X Exit
+```
+
+The `^` means:
+
+> Ctrl
+
+So:
+
+```text
+^O
+```
+
+means:
+
+```text
+Ctrl + O
+```
+
+### Save
+
+```text
+Ctrl + O
+```
+
+Then:
+
+```text
+Enter
+```
+
+### Exit
+
+```text
+Ctrl + X
+```
+
+If Nano asks whether to save:
+
+```text
+Y
+```
+
+means yes.
+
+```text
+N
+```
+
+means no.
+
+---
+
+# 19. Deleting files and directories
+
+## Delete a file
+
+```bash
+rm filename
+```
+
+Example:
+
+```bash
+rm main.yaml
+```
+
+Be careful: `rm` generally does not put things in a recycle bin.
+
+---
+
+## Delete an empty directory
+
+```bash
+rmdir directory
+```
+
+You used this to remove the mistakenly-created:
+
+```text
+main.yaml/
+```
+
+directory.
+
+---
+
+## Delete a directory and its contents
+
+```bash
+rm -r directory
+```
+
+`-r` means recursive.
+
+Be very careful with this.
+
+A particularly dangerous command is:
+
+```bash
+rm -rf
+```
+
+because:
+
+```text
+-r = recursive
+-f = force
+```
+
+Don't use `rm -rf` casually.
+
+---
+
+# 20. Moving and renaming
+
+Linux uses `mv` for both.
+
+Rename:
+
+```bash
+mv oldname.txt newname.txt
+```
+
+Move:
+
+```bash
+mv file.txt documents/
+```
+
+---
+
+# 21. Copying
+
+Use:
+
+```bash
+cp file.txt backup.txt
+```
+
+Copy a directory recursively:
+
+```bash
+cp -r directory backup-directory
+```
+
+---
+
+# 22. Reading files
+
+## `cat`
+
+Print an entire file:
+
+```bash
+cat hosts
+```
+
+You used:
+
+```bash
+cat roles/init/tasks/main.yaml
+```
+
+This is great for short files.
+
+---
+
+## `less`
+
+For longer files:
+
+```bash
+less filename
+```
+
+You can scroll.
+
+Press:
+
+```text
+q
+```
+
+to quit.
+
+---
+
+## `head`
+
+First lines:
+
+```bash
+head filename
+```
+
+---
+
+## `tail`
+
+Last lines:
+
+```bash
+tail filename
+```
+
+Useful for logs:
+
+```bash
+tail -f logfile
+```
+
+`-f` means follow the file as it changes.
+
+---
+
+# 23. Searching for commands
+
+You asked how to independently search for a command based on its function.
+
+A very useful tool is:
+
+```bash
+man
+```
+
+For example:
+
+```bash
+man mkdir
+```
+
+Manual page for `mkdir`.
+
+You can also use:
+
+```bash
+mkdir --help
+```
+
+or:
+
+```bash
+rm --help
+```
+
+The general pattern is:
+
+```bash
+command --help
+```
+
+---
+
+# 24. `man` pages
+
+For example:
+
+```bash
+man rm
+```
+
+You can search within the manual using:
+
+```text
+/
+```
+
+then type a search term.
+
+For example:
+
+```text
+/delete
+```
+
+Press:
+
+```text
+n
+```
+
+to find the next occurrence.
+
+Exit with:
+
+```text
+q
+```
+
+---
+
+# 25. Finding commands
+
+Useful commands:
+
+```bash
+which ansible
+```
+
+This answers:
+
+> Which executable will my shell use?
+
+You discovered:
+
+```text
+/usr/bin/ansible
+```
+
+Later you changed it to your virtual environment's version.
+
+Another useful command:
+
+```bash
+type ansible
+```
+
+This can tell you whether something is:
+
+* an executable
+* alias
+* shell builtin
+* etc.
+
+---
+
+# 26. Pipes
+
+Linux commands can be connected together.
+
+For example:
+
+```bash
+ls -la | less
+```
+
+The `|` means:
+
+> Take the output of the command on the left and feed it into the command on the right.
+
+Think:
+
+```text
+ls -la
+   │
+   │ output
+   ▼
+ less
+```
+
+---
+
+# 27. Redirection
+
+You can send output into a file.
+
+```bash
+ls > files.txt
+```
+
+This creates/replaces `files.txt`.
+
+Append instead:
+
+```bash
+ls >> files.txt
+```
+
+The difference:
+
+```text
+>   overwrite
+>>  append
+```
+
+---
+
+# 28. Permissions
+
+Linux files have permissions.
+
+Example:
+
+```text
+-rwxr-xr--
+```
+
+Conceptually:
+
+```text
+-    rwx    r-x    r--
+│      │      │      │
+│      │      │      └── others
+│      │      └───────── group
+│      └──────────────── owner
+└─────────────────────── file type
+```
+
+The three basic permissions are:
+
+```text
+r = read
+w = write
+x = execute
+```
+
+For example:
+
+```text
+rwx
+```
+
+means:
+
+> read + write + execute
+
+---
+
+# 29. `chmod`
+
+Changes permissions.
+
+You used:
+
+```bash
+chmod +x run-tests.sh
+```
+
+Meaning:
+
+> Add execute permission to `run-tests.sh`.
+
+This is why you can run:
+
+```bash
+./run-tests.sh
+```
+
+---
+
+# 30. Why `./run-tests.sh`?
+
+When you type:
+
+```bash
+run-tests.sh
+```
+
+the shell searches its configured command locations.
+
+Your current directory isn't necessarily included.
+
+So:
+
+```bash
+./run-tests.sh
+```
+
+means:
+
+> Execute `run-tests.sh` from the current directory.
+
+`./` means:
+
+> current directory.
+
+---
+
+# 31. Shell / terminal
+
+The terminal is the window.
+
+The **shell** is the program interpreting your commands.
+
+Common shells include:
+
+```text
+bash
+zsh
+fish
+```
+
+You're likely using Bash.
+
+When you type:
+
+```bash
+mkdir test
+```
+
+the shell interprets that command and starts the corresponding program.
+
+---
+
+# 32. Environment variables
+
+You saw:
+
+```bash
+echo $PATH
+```
+
+`PATH` is an environment variable.
+
+It tells your shell where to look for executable programs.
+
+For example:
+
+```text
+/usr/local/bin
+/usr/bin
+/bin
+...
+```
+
+If you type:
+
+```bash
+ansible
+```
+
+the shell searches those directories.
+
+This is why:
+
+```bash
+which ansible
+```
+
+was important.
+
+---
+
+# 33. Your Ansible virtual environment
+
+The course requires a particular Ansible version.
+
+Instead of installing everything globally, you created:
+
+```text
+~/ansible-venv/
+```
+
+This is a Python virtual environment.
+
+Conceptually:
+
+```text
+System Python / system software
+        │
+        ├── system Ansible 2.20.1
+        │
+        │
+~/ansible-venv/
+        │
+        └── course Ansible 14.3.1
+                         │
+                         └── ansible-core 2.21.3
+```
+
+The virtual environment isolates Python packages from the system installation.
+
+---
+
+# 34. Why your Ansible version mattered
+
+Your test reported:
+
+```text
+Wrong Ansible version:
+ansible [core 2.20.1]
+```
+
+The course expects:
+
+```text
+Ansible 14.3.1
+ansible-core 2.21.3
+```
+
+Those numbers are related but aren't identical.
+
+You installed:
+
+```bash
+~/ansible-venv/bin/pip install ansible==14.3.1
+```
+
+Then:
+
+```bash
+~/ansible-venv/bin/ansible --version
+```
+
+should report:
+
+```text
+ansible [core 2.21.3]
+```
+
+---
+
+# 35. What `source ~/.profile` does
+
+Your `.profile` contains shell configuration.
+
+You added:
+
+```bash
+PATH="$HOME/ansible-venv/bin:$PATH"
+```
+
+This means:
+
+> Put the Ansible virtual environment's `bin` directory at the beginning of my PATH.
+
+Then:
+
+```bash
+source ~/.profile
+```
+
+tells the current shell:
+
+> Re-read this configuration now.
+
+Otherwise you'd often need to start a new shell/login session.
+
+---
+
+# 36. APT
+
+APT is Ubuntu's package management system.
+
+Think of it like an official software warehouse.
+
+Instead of manually downloading and installing:
+
+```text
+nginx
+```
+
+you can use:
+
+```bash
+apt install nginx
+```
+
+APT knows:
+
+* where packages come from
+* what dependencies they need
+* how to install them
+* how to upgrade them
+* how to remove them
+
+---
+
+# 37. APT cache
+
+Before installing packages, Ubuntu maintains information about available packages.
+
+You added an Ansible task:
+
+```yaml
+- name: Update APT cache
+  ansible.builtin.apt:
+    cache_valid_time: 86400
+```
+
+This means approximately:
+
+> Make sure the APT package information is no older than 86400 seconds.
+
+86400 seconds = 24 hours.
+
+So you're not necessarily downloading the package itself.
+
+You're refreshing **APT's information about available packages**.
+
+---
+
+# 38. Installing Nginx
+
+Your Nginx role contains:
+
+```yaml
+- name: Install Nginx
+  ansible.builtin.apt:
+    name: nginx
+    state: present
+```
+
+This means:
+
+> Ensure the `nginx` package is installed.
+
+`state: present` is important.
+
+It doesn't mean:
+
+> Install it every time.
+
+It means:
+
+> The desired state is that Nginx is installed.
+
+If it's already installed, Ansible normally doesn't need to reinstall it.
+
+This is called **idempotence**.
+
+---
+
+# 39. What is Nginx?
+
+Nginx is a web server.
+
+After installation, conceptually:
+
+```text
+Internet
+   │
+   │ HTTP
+   ▼
+Nginx
+   │
+   ▼
+web content
+```
+
+By default:
+
+```text
+HTTP = port 80
+```
+
+Your assignment specifically said **not to change the port**.
+
+---
+
+# 40. What is Ansible?
+
+Ansible is a **configuration management / automation tool**.
+
+Instead of manually doing:
+
+```bash
+ssh server
+sudo apt update
+sudo apt install nginx
+...
+```
+
+you describe what you want:
+
+```yaml
+- name: Install Nginx
+  ansible.builtin.apt:
+    name: nginx
+    state: present
+```
+
+Ansible performs the necessary work remotely.
+
+This is called **declarative configuration**.
+
+You describe the desired state.
+
+---
+
+# 41. Ansible architecture
+
+Your setup looks like:
+
+```text
+CONTROL NODE
+     │
+     │ Ansible
+     │
+     │ SSH
+     ▼
+MANAGED HOST
+```
+
+The control node contains:
+
+```text
+playbooks
+inventory
+roles
+Ansible configuration
+SSH credentials
+```
+
+The managed host contains:
+
+```text
+Ubuntu
+SSH server
+Python
+installed packages
+users
+configuration
+```
+
+---
+
+# 42. Ansible inventory
+
+Your `hosts` file is the inventory.
+
+Example:
+
+```ini
+Sjinkwe-1 ansible_host=193.40.157.25 ansible_port=11722 ansible_user=ubuntu
+
+[web_servers]
+Sjinkwe-1
+```
+
+The first line defines a host.
+
+```text
+Sjinkwe-1
+```
+
+is Ansible's name for the host.
+
+Then:
+
+```text
+ansible_host=193.40.157.25
+```
+
+says:
+
+> The actual network address is this IP.
+
+```text
+ansible_port=11722
+```
+
+says:
+
+> Use this SSH port.
+
+```text
+ansible_user=ubuntu
+```
+
+says:
+
+> Log in as Ubuntu user `ubuntu`.
+
+---
+
+# 43. Ansible groups
+
+This:
+
+```ini
+[web_servers]
+Sjinkwe-1
+```
+
+creates an inventory group.
+
+Conceptually:
+
+```text
+web_servers
+└── Sjinkwe-1
+```
+
+Now you can target the group:
+
+```bash
+ansible web_servers -m ansible.builtin.ping
+```
+
+instead of targeting every host:
+
+```bash
+ansible all -m ansible.builtin.ping
+```
+
+---
+
+# 44. Ansible modules
+
+Ansible has modules that perform specific tasks.
+
+Examples:
+
+```text
+ansible.builtin.apt
+ansible.builtin.user
+ansible.builtin.ping
+ansible.posix.authorized_key
+```
+
+Think of modules as tools in a toolbox.
+
+```text
+apt module
+    → manage packages
+
+user module
+    → manage users
+
+authorized_key
+    → manage SSH authorized keys
+
+ping module
+    → test Ansible connectivity
+```
+
+---
+
+# 45. `ansible.builtin.ping`
+
+You ran:
+
+```bash
+ansible all -m ansible.builtin.ping
+```
+
+Breakdown:
+
+```text
+ansible
+    ↓
+run Ansible
+
+all
+    ↓
+target every host
+
+-m
+    ↓
+use a module
+
+ansible.builtin.ping
+    ↓
+use Ansible's ping module
+```
+
+It's not exactly the same as ordinary network `ping`.
+
+Ansible's ping tests whether Ansible can connect to the machine and execute its module successfully.
+
+---
+
+# 46. SSH host key problem
+
+You encountered:
+
+```text
+REMOTE HOST IDENTIFICATION HAS CHANGED!
+```
+
+SSH stores server identity information in:
+
+```text
+~/.ssh/known_hosts
+```
+
+SSH uses this to protect against connecting to an unexpected server.
+
+You resolved it with:
+
+```bash
+ssh-keygen -f ~/.ssh/known_hosts -R '[193.40.157.25]:11722'
+```
+
+This removes the old stored host key for that address/port.
+
+Important distinction:
+
+```text
+known_hosts
+    ↓
+identifies REMOTE SERVERS
+```
+
+while:
+
+```text
+id_ed25519
+    ↓
+identifies YOU
+```
+
+They're completely different things.
+
+---
+
+# 47. SSH `Permission denied (publickey)`
+
+You also encountered:
+
+```text
+Permission denied (publickey)
+```
+
+This means:
+
+> The SSH server is reachable, but it did not accept the key offered for authentication.
+
+That's different from:
+
+```text
+Connection refused
+```
+
+or:
+
+```text
+No route to host
+```
+
+The SSH conversation got far enough to attempt authentication.
+
+---
+
+# 48. Explicitly selecting a key
+
+You used:
+
+```bash
+ssh -i ~/.ssh/id_ed25519 -p 11722 ubuntu@193.40.157.25
+```
+
+Breakdown:
+
+```text
+ssh
+│
+├── -i ~/.ssh/id_ed25519
+│      use this private key
+│
+├── -p 11722
+│      use this SSH port
+│
+└── ubuntu@193.40.157.25
+       user + server
+```
+
+This was useful for diagnosing whether SSH itself worked.
+
+---
+
+# 49. Ansible configuration
+
+You have:
+
+```text
+ansible.cfg
+```
+
+This controls Ansible behavior.
+
+For example, it can specify:
+
+* inventory location
+* SSH settings
+* defaults
+* privilege escalation
+* etc.
+
+You encountered an error:
+
+```text
+section 'defaults' already exists
+```
+
+because configuration files use sections such as:
+
+```ini
+[defaults]
+```
+
+You cannot define the same section twice in the way you had done.
+
+---
+
+# 50. YAML
+
+Ansible playbooks and role tasks are generally written in YAML.
+
+YAML is primarily about:
+
+* indentation
+* keys
+* values
+* lists
+* structure
+
+Example:
+
+```yaml
+- name: Install Nginx
+  ansible.builtin.apt:
+    name: nginx
+    state: present
+```
+
+Structure:
+
+```text
+task
+├── name
+└── module
+    ├── name
+    └── state
+```
+
+---
+
+# 51. YAML indentation
+
+Spaces are meaningful.
+
+This is correct:
+
+```yaml
+- name: Install Nginx
+  ansible.builtin.apt:
+    name: nginx
+    state: present
+```
+
+The indentation levels are:
+
+```text
+0 spaces  - name
+2 spaces    ansible.builtin.apt
+4 spaces      name
+4 spaces      state
+```
+
+Visualized:
+
+```text
+- name: Install Nginx
+··ansible.builtin.apt:
+····name: nginx
+····state: present
+```
+
+Use **spaces, not tabs**.
+
+---
+
+# 52. Why your YAML failed
+
+You had:
+
+```yaml
+- name: Update APT cache
+ansible.builtin.apt:
+```
+
+The module was supposed to be nested under the task.
+
+It needed:
+
+```yaml
+- name: Update APT cache
+  ansible.builtin.apt:
+```
+
+The two spaces tell YAML:
+
+> `ansible.builtin.apt` belongs to this task.
+
+---
+
+# 53. Ansible roles
+
+Roles are a way of organizing Ansible configuration.
+
+Your repository eventually looks something like:
+
+```text
+ica0002/
+├── ansible.cfg
+├── hosts
+├── infra.yaml
+├── run-tests.sh
+└── roles/
+    ├── init/
+    │   └── tasks/
+    │       └── main.yaml
+    │
+    └── nginx/
+        └── tasks/
+            └── main.yaml
+```
+
+---
+
+# 54. What is `main.yaml`?
+
+Inside a role:
+
+```text
+roles/nginx/tasks/main.yaml
+```
+
+is the default/main task file for that role.
+
+You can think:
+
+```text
+nginx role
+    ↓
+tasks
+    ↓
+main.yaml
+    ↓
+tasks to execute
+```
+
+For your Nginx role:
+
+```yaml
+- name: Install Nginx
+  ansible.builtin.apt:
+    name: nginx
+    state: present
+```
+
+---
+
+# 55. Role naming conventions
+
+Your assignment says:
+
+```text
+nginx
+```
+
+so the directory is:
+
+```text
+roles/nginx/
+```
+
+Not:
+
+```text
+roles/Nginx/
+roles/nginx-role/
+roles/webserver/
+```
+
+Names matter because Ansible uses these paths to find roles.
+
+---
+
+# 56. Typical Ansible role structure
+
+A more complete role can look like:
+
+```text
+roles/
+└── nginx/
+    ├── tasks/
+    │   └── main.yaml
+    ├── handlers/
+    │   └── main.yaml
+    ├── templates/
+    ├── files/
+    ├── vars/
+    │   └── main.yaml
+    ├── defaults/
+    │   └── main.yaml
+    └── meta/
+        └── main.yaml
+```
+
+You don't necessarily need all of these.
+
+### `tasks/`
+
+Tasks to execute.
+
+### `handlers/`
+
+Special tasks usually triggered when something changes.
+
+### `templates/`
+
+Jinja2 templates for generating configuration files.
+
+### `files/`
+
+Static files to copy to servers.
+
+### `vars/`
+
+Role variables.
+
+### `defaults/`
+
+Default variables that can be overridden.
+
+### `meta/`
+
+Role metadata/dependencies.
+
+For your beginner labs, **don't create directories you don't need**.
+
+---
+
+# 57. Ansible playbooks
+
+Your:
+
+```text
+infra.yaml
+```
+
+is a playbook.
+
+A playbook can contain one or more **plays**.
+
+Your structure became:
+
+```yaml
+- name: Initial setup
+  hosts: all
+  roles:
+    - init
+
+- name: Web servers
+  hosts: web_servers
+  roles:
+    - nginx
+```
+
+There are two plays.
+
+---
+
+# 58. What is a play?
+
+A play says:
+
+> "Do this collection of things to these machines."
+
+First play:
+
+```yaml
+- name: Initial setup
+  hosts: all
+  roles:
+    - init
+```
+
+Means:
+
+> Run the `init` role on all hosts.
+
+Second:
+
+```yaml
+- name: Web servers
+  hosts: web_servers
+  roles:
+    - nginx
+```
+
+Means:
+
+> Run the `nginx` role on all hosts belonging to `web_servers`.
+
+---
+
+# 59. The complete Ansible chain
+
+This is perhaps the most important diagram:
+
+```text
+infra.yaml
+   │
+   │ says:
+   │ "run nginx on web_servers"
+   ▼
+inventory: hosts
+   │
+   │ says:
+   │ web_servers = Sjinkwe-1
+   │
+   │ and gives IP/user/port
+   ▼
+Ansible connects using SSH
+   │
+   ▼
+Sjinkwe-1 / Ubuntu VM
+   │
+   ▼
+nginx role
+   │
+   ▼
+roles/nginx/tasks/main.yaml
+   │
+   ▼
+ansible.builtin.apt
+   │
+   ▼
+APT
+   │
+   ▼
+nginx package installed
+```
+
+That is the whole system.
+
+---
+
+# 60. Your `init` role
+
+Your `init` role started with the ping task.
+
+Eventually it contained things like:
+
+```yaml
+- name: Create juri user
+  ansible.builtin.user:
+    name: juri
+
+- name: Create roman user
+  ansible.builtin.user:
+    name: roman
+
+- name: Add juri SSH key
+  ansible.posix.authorized_key:
+    user: juri
+    key: ...
+
+- name: Add roman SSH key
+  ansible.posix.authorized_key:
+    user: roman
+    key: ...
+
+- name: Update APT cache
+  ansible.builtin.apt:
+    cache_valid_time: 86400
+```
+
+The assignment later told you to comment out the old ping task.
+
+---
+
+# 61. Ansible user module
+
+This:
+
+```yaml
+- name: Create juri user
+  ansible.builtin.user:
+    name: juri
+```
+
+means:
+
+> Ensure a Linux user named `juri` exists on the managed host.
+
+Ansible handles the actual Linux account creation.
+
+---
+
+# 62. SSH authorized keys
+
+A user's SSH keys are normally stored in:
+
+```text
+/home/juri/.ssh/authorized_keys
+```
+
+The `authorized_keys` file contains public keys that are allowed to authenticate as that user.
+
+Conceptually:
+
+```text
+juri's account
+    │
+    └── .ssh/
+         └── authorized_keys
+                │
+                └── allowed public keys
+```
+
+The important relationship is:
+
+```text
+your private key
+       │
+       │ proves possession
+       ▼
+matching public key
+       │
+       │ stored in
+       ▼
+~/.ssh/authorized_keys
+```
+
+---
+
+# 63. GitHub SSH keys
+
+You discovered that public keys can be retrieved from:
+
+```text
+https://github.com/hudolejev.keys
+```
+
+and:
+
+```text
+https://github.com/romankuchin.keys
+```
+
+Those pages contain public SSH keys associated with the GitHub account.
+
+The assignment specifically told you **not to use `lookup()` methods**, so follow the exact approach required by the lab rather than adding unnecessary Ansible complexity.
+
+---
+
+# 64. Git
+
+Git is a **version control system**.
+
+Think of it as a system that records versions of your project.
+
+Without Git:
+
+```text
+project-final
+project-final2
+project-final-really
+project-final-really-final
+```
+
+With Git:
+
+```text
+commit 1
+   ↓
+commit 2
+   ↓
+commit 3
+   ↓
+commit 4
+```
+
+Git remembers what changed.
+
+---
+
+# 65. Git repository
+
+Your:
+
+```text
+ica0002/
+```
+
+directory is a Git repository.
+
+There is a hidden:
+
+```text
+.git/
+```
+
+directory containing Git's internal data.
+
+Don't manually modify `.git`.
+
+---
+
+# 66. GitHub
+
+GitHub is a hosting service for Git repositories.
+
+Your workflow is:
+
+```text
+local repository
+      │
+      │ git push
+      ▼
+GitHub repository
+```
+
+Teachers can inspect your GitHub repository.
+
+---
+
+# 67. `git status`
+
+One of the most useful Git commands:
+
+```bash
+git status
+```
+
+It tells you:
+
+* modified files
+* untracked files
+* staged files
+* branch information
+* whether your working tree is clean
+
+Use it constantly.
+
+---
+
+# 68. `git add`
+
+Stage a specific file:
+
+```bash
+git add infra.yaml
+```
+
+Several:
+
+```bash
+git add hosts infra.yaml
+```
+
+A directory:
+
+```bash
+git add roles/nginx/
+```
+
+Everything:
+
+```bash
+git add .
+```
+
+The important concept:
+
+```text
+working directory
+      │
+      │ git add
+      ▼
+staging area
+```
+
+---
+
+# 69. Why staging exists
+
+Suppose you changed:
+
+```text
+hosts
+infra.yaml
+nginx role
+some unrelated file
+```
+
+You only want to commit the Nginx work.
+
+You can stage:
+
+```bash
+git add hosts infra.yaml roles/nginx/
+```
+
+Then inspect:
+
+```bash
+git diff --staged
+```
+
+Only the staged changes are included in the next commit.
+
+---
+
+# 70. `git commit`
+
+```bash
+git commit -m "Add nginx web server role"
+```
+
+A commit is a saved snapshot in Git's history.
+
+The staging area becomes the basis of the commit.
+
+```text
+working files
+     │
+     │ git add
+     ▼
+staging area
+     │
+     │ git commit
+     ▼
+local Git history
+```
+
+---
+
+# 71. `git push`
+
+```bash
+git push
+```
+
+Sends your local commits to GitHub.
+
+```text
+local Git
+   │
+   │ git push
+   ▼
+GitHub
+```
+
+---
+
+# 72. `git pull`
+
+The reverse-ish operation:
+
+```bash
+git pull
+```
+
+Gets changes from the remote repository and incorporates them into your local repository.
+
+---
+
+# 73. `git diff`
+
+See unstaged changes:
+
+```bash
+git diff
+```
+
+See staged changes:
+
+```bash
+git diff --staged
+```
+
+This is an excellent habit before committing.
+
+---
+
+# 74. Git's basic workflow
+
+A good workflow is:
+
+```bash
+git status
+```
+
+↓
+
+```bash
+git diff
+```
+
+↓
+
+```bash
+git add specific-file
+```
+
+↓
+
+```bash
+git diff --staged
+```
+
+↓
+
+```bash
+git commit -m "Describe change"
+```
+
+↓
+
+```bash
+git push
+```
+
+---
+
+# 75. `curl`
+
+You used:
+
+```bash
+curl -O https://...
+```
+
+`curl` is a command-line network tool.
+
+It can download or send data.
+
+The:
+
+```text
+-O
+```
+
+option means:
+
+> Save the downloaded content using the remote filename.
+
+So:
+
+```bash
+curl -O URL
+```
+
+downloads the file into your current directory.
+
+---
+
+# 76. Shell scripts
+
+You downloaded:
+
+```text
+run-tests.sh
+```
+
+The `.sh` means it's a shell script.
+
+It contains shell commands that can be executed sequentially.
+
+You made it executable:
+
+```bash
+chmod +x run-tests.sh
+```
+
+Then you can run:
+
+```bash
+./run-tests.sh
+```
+
+This is automation again.
+
+Instead of manually running eight tests, the script does it for you.
+
+---
+
+# 77. Testing
+
+Your tests reported:
+
+```text
+7 passed
+1 failed
+```
+
+That means the testing framework ran eight tests.
+
+One was:
+
+```text
+test_local_ansible_version
+```
+
+and it failed because your version was:
+
+```text
+2.20.1
+```
+
+instead of:
+
+```text
+2.21.3
+```
+
+This demonstrates something important:
+
+> Your code can be correct while your environment is incorrect.
+
+The test wasn't saying:
+
+> Nginx is wrong.
+
+It was saying:
+
+> The Ansible version on the control machine doesn't meet the course requirement.
+
+---
+
+# 78. `run-tests.sh`
+
+The course test script probably performs several automated checks.
+
+You installed it with:
+
+```bash
+curl -O ...
+```
+
+then:
+
+```bash
+chmod +x run-tests.sh
+```
+
+then committed it:
+
+```bash
+git add run-tests.sh
+git commit -m 'Add tests'
+git push
+```
+
+This means the test tool itself becomes part of your repository.
+
+---
+
+# 79. Common Linux commands worth learning next
+
+Here's a practical cheat sheet.
+
+### Location
+
+```bash
+pwd
+```
+
+Where am I?
+
+```bash
+ls
+```
+
+What's here?
+
+```bash
+ls -la
+```
+
+Show everything with details.
+
+```bash
+cd directory
+```
+
+Enter directory.
+
+```bash
+cd ..
+```
+
+Go up.
+
+```bash
+cd ~
+```
+
+Go home.
+
+---
+
+### Files
+
+```bash
+touch file.txt
+```
+
+Create empty file.
+
+```bash
+cat file.txt
+```
+
+Print file.
+
+```bash
+less file.txt
+```
+
+Read interactively.
+
+```bash
+nano file.txt
+```
+
+Edit.
+
+```bash
+cp file.txt backup.txt
+```
+
+Copy.
+
+```bash
+mv file.txt new.txt
+```
+
+Rename/move.
+
+```bash
+rm file.txt
+```
+
+Delete.
+
+---
+
+### Directories
+
+```bash
+mkdir test
+```
+
+Create directory.
+
+```bash
+mkdir -p a/b/c
+```
+
+Create nested directories.
+
+```bash
+rmdir test
+```
+
+Remove empty directory.
+
+```bash
+rm -r test
+```
+
+Remove directory recursively.
+
+---
+
+### Searching
+
+```bash
+find . -name "*.yaml"
+```
+
+Find YAML files below the current directory.
+
+```bash
+grep "nginx" file.txt
+```
+
+Search a file for text.
+
+```bash
+grep -R "nginx" .
+```
+
+Search recursively.
+
+```bash
+which ansible
+```
+
+Find which executable will run.
+
+```bash
+history
+```
+
+Show previously executed commands.
+
+---
+
+# 80. `find`
+
+Very useful.
+
+For example:
+
+```bash
+find . -type f
+```
+
+means:
+
+> Starting here, find regular files.
+
+Directories:
+
+```bash
+find . -type d
+```
+
+YAML files:
+
+```bash
+find . -name "*.yaml"
+```
+
+Files named `main.yaml`:
+
+```bash
+find . -name "main.yaml"
+```
+
+This is particularly useful when you're unsure where you accidentally created something.
+
+---
+
+# 81. `grep`
+
+Search text.
+
+```bash
+grep "web_servers" hosts
+```
+
+Searches `hosts` for `web_servers`.
+
+Recursive:
+
+```bash
+grep -R "nginx" roles/
+```
+
+Useful for answering:
+
+> Where in my project did I mention Nginx?
+
+---
+
+# 82. `history`
+
+If you forget a command you recently used:
+
+```bash
+history
+```
+
+You can also search interactively in Bash using:
+
+```text
+Ctrl + R
+```
+
+Then type something like:
+
+```text
+ansible
+```
+
+Bash will search your previous commands.
+
+This is an extremely useful skill.
+
+---
+
+# 83. `clear`
+
+Clear terminal:
+
+```bash
+clear
+```
+
+Shortcut:
+
+```text
+Ctrl + L
+```
+
+---
+
+# 84. `echo`
+
+Print text:
+
+```bash
+echo hello
+```
+
+Print an environment variable:
+
+```bash
+echo $PATH
+```
+
+The `$` means:
+
+> Expand the value of this variable.
+
+---
+
+# 85. `whoami`
+
+```bash
+whoami
+```
+
+Tells you which Linux user you're currently operating as.
+
+Useful when you're unsure whether you're on your own machine or logged into the VM.
+
+---
+
+# 86. `hostname`
+
+```bash
+hostname
+```
+
+Shows the machine's hostname.
+
+Again, very useful when working with multiple machines.
+
+---
+
+# 87. `uname`
+
+```bash
+uname -a
+```
+
+Provides system/kernel information.
+
+---
+
+# 88. Processes
+
+Later you'll encounter:
+
+```bash
+ps
+```
+
+or:
+
+```bash
+ps aux
+```
+
+to inspect running processes.
+
+And:
+
+```bash
+top
+```
+
+to monitor them.
+
+A more modern alternative is:
+
+```bash
+htop
+```
+
+if installed.
+
+---
+
+# 89. Services
+
+Linux servers commonly use `systemd`.
+
+You'll encounter:
+
+```bash
+systemctl status nginx
+```
+
+This asks:
+
+> Is the Nginx service running?
+
+Start:
+
+```bash
+sudo systemctl start nginx
+```
+
+Stop:
+
+```bash
+sudo systemctl stop nginx
+```
+
+Restart:
+
+```bash
+sudo systemctl restart nginx
+```
+
+Enable at boot:
+
+```bash
+sudo systemctl enable nginx
+```
+
+Ansible can automate these operations too.
+
+---
+
+# 90. `sudo`
+
+`sudo` means:
+
+> Run this command with elevated privileges.
+
+For example:
+
+```bash
+sudo apt install nginx
+```
+
+Normal users don't necessarily have permission to modify the entire system.
+
+`sudo` temporarily gives you administrative privileges if your account is allowed to use it.
+
+---
+
+# 91. Root user
+
+Linux has a special administrator account:
+
+```text
+root
+```
+
+Root can do essentially anything on the system.
+
+You generally don't want to operate permanently as root.
+
+Instead:
+
+```bash
+sudo command
+```
+
+lets you perform individual administrative operations.
+
+Ansible can also use privilege escalation, commonly through:
+
+```yaml
+become: true
+```
+
+---
+
+# 92. Network commands worth learning
+
+Check connectivity:
+
+```bash
+ping 193.40.157.25
+```
+
+Check SSH:
+
+```bash
+ssh -p 11722 ubuntu@193.40.157.25
+```
+
+Check listening ports:
+
+```bash
+ss -tulpn
+```
+
+Test an HTTP server:
+
+```bash
+curl http://localhost
+```
+
+Check HTTP headers:
+
+```bash
+curl -I http://localhost
+```
+
+These become very useful once you're working with Nginx.
+
+---
+
+# 93. Package commands
+
+On Ubuntu:
+
+```bash
+apt search nginx
+```
+
+Search available packages.
+
+```bash
+apt show nginx
+```
+
+Show package information.
+
+```bash
+sudo apt install nginx
+```
+
+Install.
+
+```bash
+sudo apt remove nginx
+```
+
+Remove.
+
+```bash
+sudo apt update
+```
+
+Update package lists.
+
+```bash
+sudo apt upgrade
+```
+
+Upgrade installed packages.
+
+Your Ansible role is essentially automating these sorts of operations.
+
+---
+
+# 94. Ansible command structure
+
+A typical ad-hoc Ansible command:
+
+```bash
+ansible web_servers -m ansible.builtin.ping
+```
+
+Structure:
+
+```text
+ansible
+   │
+   ├── web_servers
+   │      target
+   │
+   ├── -m
+   │      module
+   │
+   └── ansible.builtin.ping
+          module name
+```
+
+Playbook execution:
+
+```bash
+ansible-playbook infra.yaml
+```
+
+Structure:
+
+```text
+ansible-playbook
+      │
+      └── infra.yaml
+             │
+             └── instructions
+```
+
+---
+
+# 95. Ansible's naming conventions
+
+You'll frequently see:
+
+```text
+ansible.builtin.apt
+```
+
+and:
+
+```text
+ansible.posix.authorized_key
+```
+
+The structure is approximately:
+
+```text
+collection.module
+```
+
+For example:
+
+```text
+ansible.builtin.apt
+```
+
+means:
+
+```text
+collection = ansible.builtin
+module     = apt
+```
+
+Using fully qualified module names is a good habit.
+
+---
+
+# 96. Your complete project
+
+At this point your repository conceptually looks like:
+
+```text
+ica0002/
+│
+├── .git/
+│
+├── ansible.cfg
+│
+├── hosts
+│
+├── infra.yaml
+│
+├── run-tests.sh
+│
+└── roles/
+    │
+    ├── init/
+    │   └── tasks/
+    │       └── main.yaml
+    │
+    └── nginx/
+        └── tasks/
+            └── main.yaml
+```
+
+Each component has a purpose.
+
+---
+
+# 97. What each file does
+
+### `ansible.cfg`
+
+Controls Ansible's configuration.
+
+```text
+How should Ansible behave?
+```
+
+### `hosts`
+
+Defines:
+
+```text
+What machines exist?
+What are their addresses?
+How do I connect?
+Which groups do they belong to?
+```
+
+### `infra.yaml`
+
+Defines:
+
+```text
+What should happen?
+To which groups?
+Which roles should run?
+```
+
+### `roles/init/tasks/main.yaml`
+
+Defines:
+
+```text
+Initial machine setup
+```
+
+Such as:
+
+* users
+* SSH keys
+* APT cache
+
+### `roles/nginx/tasks/main.yaml`
+
+Defines:
+
+```text
+Nginx setup
+```
+
+Such as:
+
+* install Nginx
+* configure Nginx
+* manage its service
+
+### `run-tests.sh`
+
+Runs course tests.
+
+---
+
+# 98. The entire lifecycle of your assignment
+
+You can now understand the whole process as one story.
+
+### Step 1 — GitHub
+
+You create a private repository:
+
+```text
+GitHub
+└── ica0002
+```
+
+---
+
+### Step 2 — Clone it
+
+```bash
+git clone git@github.com:<username>/ica0002
+```
+
+Now you have:
+
+```text
+local computer
+└── ica0002/
+```
+
+---
+
+### Step 3 — SSH
+
+Your control machine has:
+
+```text
+~/.ssh/id_ed25519
+```
+
+The VM accepts the corresponding public key.
+
+You can connect:
+
+```bash
+ssh -i ~/.ssh/id_ed25519 -p 11722 ubuntu@193.40.157.25
+```
+
+---
+
+### Step 4 — Inventory
+
+You tell Ansible:
+
+```text
+Sjinkwe-1
+    IP = 193.40.157.25
+    port = 11722
+    user = ubuntu
+```
+
+and:
+
+```text
+web_servers
+└── Sjinkwe-1
+```
+
+---
+
+### Step 5 — Initial role
+
+Your `init` role performs basic machine setup.
+
+```text
+init
+├── users
+├── SSH keys
+└── APT cache
+```
+
+---
+
+### Step 6 — Nginx role
+
+Your new role:
+
+```text
+nginx
+└── install nginx
+```
+
+---
+
+### Step 7 — Playbook
+
+Your playbook connects everything:
+
+```yaml
+- name: Initial setup
+  hosts: all
+  roles:
+    - init
+
+- name: Web servers
+  hosts: web_servers
+  roles:
+    - nginx
+```
+
+---
+
+### Step 8 — Run Ansible
+
+```bash
+ansible-playbook infra.yaml
+```
+
+Ansible:
+
+```text
+reads infra.yaml
+      ↓
+reads hosts
+      ↓
+finds web_servers
+      ↓
+finds Sjinkwe-1
+      ↓
+SSH to VM
+      ↓
+runs init
+      ↓
+runs nginx
+      ↓
+VM configured
+```
+
+---
+
+### Step 9 — Test
+
+```bash
+./run-tests.sh
+```
+
+Tests verify whether your environment and project satisfy the course requirements.
+
+---
+
+### Step 10 — Git
+
+You commit your work:
+
+```bash
+git add ...
+git commit -m "..."
+git push
+```
+
+Teachers can then inspect your repository.
+
+---
+
+# 99. The most important mental model
+
+If you remember only one thing, remember this:
+
+```text
+                    YOUR COMPUTER
+                  / CONTROL NODE
+                         │
+                         │
+                  ┌──────▼──────┐
+                  │    Ansible  │
+                  └──────┬──────┘
+                         │
+                  reads your files
+                         │
+          ┌──────────────┼──────────────┐
+          │              │              │
+     ansible.cfg       hosts        infra.yaml
+                         │              │
+                         │              │
+                         └──────┬───────┘
+                                │
+                                ▼
+                           SSH connection
+                                │
+                                ▼
+                         UBUNTU VM
+                                │
+                    ┌───────────┴───────────┐
+                    │                       │
+                   init                   nginx
+                    │                       │
+               users/keys              Nginx package
+               APT cache                    │
+                                            ▼
+                                      web server
+```
+
+And separately:
+
+```text
+YOUR LOCAL GIT REPOSITORY
+          │
+          │ git push
+          ▼
+       GITHUB
+          │
+          │
+          ▼
+      TEACHERS
+```
+
+---
+
+# 100. A compact command reference
+
+## Navigation
+
+```bash
+pwd
+ls
+ls -l
+ls -la
+cd directory
+cd ..
+cd ~
+cd /
+```
+
+## Create
+
+```bash
+mkdir directory
+mkdir -p a/b/c
+touch file
+nano file
+```
+
+## Read
+
+```bash
+cat file
+less file
+head file
+tail file
+```
+
+## Modify
+
+```bash
+nano file
+mv old new
+cp file copy
+```
+
+## Delete
+
+```bash
+rm file
+rmdir directory
+rm -r directory
+```
+
+## Search
+
+```bash
+find . -name "file"
+grep "text" file
+grep -R "text" .
+which command
+history
+```
+
+## Permissions
+
+```bash
+chmod +x file
+```
+
+## System information
+
+```bash
+whoami
+hostname
+uname -a
+```
+
+## Processes
+
+```bash
+ps aux
+top
+```
+
+## Services
+
+```bash
+systemctl status nginx
+systemctl restart nginx
+```
+
+## Packages
+
+```bash
+apt search package
+apt show package
+sudo apt update
+sudo apt install package
+sudo apt remove package
+```
+
+## SSH
+
+```bash
+ssh user@host
+ssh -p PORT user@host
+ssh -i KEY -p PORT user@host
+ssh-keygen
+ssh-keygen -lf ...
+```
+
+## Ansible
+
+```bash
+ansible --version
+ansible all -m ansible.builtin.ping
+ansible web_servers -m ansible.builtin.ping
+ansible-playbook infra.yaml
+```
+
+## Git
+
+```bash
+git status
+git diff
+git add file
+git add .
+git diff --staged
+git commit -m "message"
+git push
+git pull
+```
+
+## Shell
+
+```bash
+echo
+source
+clear
+```
+
+---
+
+# 101. The syntax pattern you should learn
+
+A huge amount of Linux and Ansible becomes easier when you recognize this pattern:
+
+```text
+COMMAND   OPTIONS   ARGUMENTS
+```
+
+Example:
+
+```bash
+mkdir -p roles/nginx/tasks
+```
+
+```text
+COMMAND     OPTIONS    ARGUMENT
+mkdir       -p         roles/nginx/tasks
+```
+
+Another:
+
+```bash
+ssh -i ~/.ssh/id_ed25519 -p 11722 ubuntu@193.40.157.25
+```
+
+```text
+COMMAND     OPTIONS                     ARGUMENT
+ssh         -i KEY
+            -p PORT                     USER@HOST
+```
+
+Git:
+
+```bash
+git commit -m "Lab 2"
+```
+
+```text
+PROGRAM     SUBCOMMAND    OPTION         VALUE
+git         commit        -m             "Lab 2"
+```
+
+Ansible:
+
+```bash
+ansible web_servers -m ansible.builtin.ping
+```
+
+```text
+PROGRAM     TARGET        OPTION         MODULE
+ansible     web_servers   -m             ansible.builtin.ping
+```
+
+Once you start seeing commands this way, the syntax becomes much less mysterious.
+
+---
+
+# 102. And the Ansible syntax pattern
+
+Ansible YAML follows another pattern:
+
+```yaml
+- name: Human-readable task name
+  module:
+    parameter: value
+    parameter: value
+```
+
+For example:
+
+```yaml
+- name: Install Nginx
+  ansible.builtin.apt:
+    name: nginx
+    state: present
+```
+
+Think:
+
+```text
+TASK
+ │
+ ├── name
+ │
+ └── MODULE
+      │
+      ├── parameter
+      └── parameter
+```
+
+A play:
+
+```yaml
+- name: Web servers
+  hosts: web_servers
+  roles:
+    - nginx
+```
+
+Think:
+
+```text
+PLAY
+ │
+ ├── name
+ ├── hosts
+ └── roles
+      └── nginx
+```
+
+An inventory:
+
+```ini
+hostname ansible_host=IP ansible_port=PORT ansible_user=USER
+
+[group]
+hostname
+```
+
+Think:
+
+```text
+HOST DEFINITION
+      +
+GROUP MEMBERSHIP
+```
+
+---
+
+# 103. What I would learn next
+
+You now have the foundations of:
+
+* Linux
+* shell
+* files/directories
+* permissions
+* SSH
+* Git
+* GitHub
+* Python environments
+* APT
+* Ansible
+* YAML
+* inventory
+* playbooks
+* roles
+* Nginx
+
+The next concepts that will become particularly useful are:
+
+1. **`sudo` and Linux permissions**
+2. **systemd/services**
+3. **processes**
+4. **networking and ports**
+5. **DNS**
+6. **HTTP**
+7. **Ansible variables**
+8. **Ansible handlers**
+9. **Ansible templates/Jinja2**
+10. **Ansible `become`**
+11. **Git branches**
+12. **Git merge/rebase**
+13. **logs and troubleshooting**
+14. **file ownership**
+15. **environment variables**
+16. **shell scripting**
+
+The key is not to memorize hundreds of commands. Learn to ask:
+
+> **Where am I?**
+
+```bash
+pwd
+```
+
+> **What is here?**
+
+```bash
+ls -la
+```
+
+> **What type of thing is this?**
+
+```bash
+ls -ld filename
+```
+
+> **What does this command do?**
+
+```bash
+command --help
+man command
+```
+
+> **Which machine am I on?**
+
+```bash
+hostname
+whoami
+```
+
+> **What changed?**
+
+```bash
+git status
+git diff
+```
+
+> **What is Ansible targeting?**
+
+```bash
+cat hosts
+```
+
+> **What is Ansible being told to do?**
+
+```bash
+cat infra.yaml
+```
+
+> **What does a role actually do?**
+
+```bash
+cat roles/<role>/tasks/main.yaml
+```
+
+Once you habitually answer those questions, Linux and Ansible stop feeling like a collection of random commands and start looking like one connected system.
