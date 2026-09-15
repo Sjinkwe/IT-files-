@@ -1,0 +1,412 @@
+Definitely. In fact, you're at a really good point to stop reading theory and start **doing small experiments**.
+
+Since you're learning cybersecurity, I'd recommend building a mini **"network detective" lab** on your Ubuntu machine. Everything below can be done against your own computer/network.
+
+## Practical project: "What happens when I visit a website?"
+
+You'll learn:
+
+* IP addresses
+* DNS
+* routing
+* TCP connections
+* ports
+* processes
+* packets
+* encryption
+* basic traffic analysis
+
+And you'll use tools that are genuinely useful in cybersecurity.
+
+---
+
+## Step 1 — Find your own network identity
+
+Run:
+
+```bash
+ip addr show eth0
+```
+
+Find:
+
+```text
+inet ...
+```
+
+That's your **local IP address**.
+
+Then:
+
+```bash
+ip route
+```
+
+Look for:
+
+```text
+default via ...
+```
+
+That's your **default gateway**.
+
+You should be able to draw:
+
+```text
+             YOUR UBUNTU PC
+                   │
+              eth0 │
+                   │
+                   ▼
+              Gateway
+                   │
+                   ▼
+             Internet
+```
+
+---
+
+## Step 2 — Watch DNS happen
+
+Try:
+
+```bash
+resolvectl query example.com
+```
+
+You'll get an answer containing an IP address.
+
+Now you've actually performed:
+
+```text
+example.com
+     ↓
+    DNS
+     ↓
+IP address
+```
+
+Try another:
+
+```bash
+resolvectl query openai.com
+```
+
+Then ask yourself:
+
+> "Which DNS server did my computer ask?"
+
+You've already seen that information with `resolvectl status`.
+
+---
+
+## Step 3 — Follow the route
+
+Try:
+
+```bash
+ip route get 1.1.1.1
+```
+
+This asks Linux:
+
+> "If I wanted to send a packet to 1.1.1.1, what route would you use?"
+
+You might see something like:
+
+```text
+1.1.1.1 via 192.168.1.1 dev eth0 src 192.168.1.42
+```
+
+Now you can interpret it:
+
+```text
+Destination: 1.1.1.1
+Gateway:     192.168.1.1
+Interface:   eth0
+Source IP:   192.168.1.42
+```
+
+That's **real routing information**, not just theory.
+
+---
+
+# Step 4 — See which connections your computer currently has
+
+Run:
+
+```bash
+ss -tunap
+```
+
+This is a fantastic command for someone learning cybersecurity.
+
+You'll see things such as:
+
+```text
+Local Address:Port
+Foreign Address:Port
+State
+```
+
+For example:
+
+```text
+192.168.1.42:53124 → 142.250.x.x:443
+```
+
+You can interpret that as:
+
+```text
+YOUR PC
+192.168.1.42
+     │
+     │ TCP
+     │
+     ▼
+remote server
+port 443
+```
+
+Port `443` normally means **HTTPS**.
+
+This is your first glimpse of what your computer is actually doing on the network.
+
+---
+
+# Step 5 — Find which program owns a connection
+
+This is where it starts feeling like cybersecurity.
+
+Run:
+
+```bash
+ss -tunap
+```
+
+You may see:
+
+```text
+users:(("firefox",pid=1234,fd=42))
+```
+
+Now you can answer:
+
+> **Which process on my machine opened this network connection?**
+
+That's an extremely useful security question.
+
+For example:
+
+```text
+Firefox
+   │
+   ├── connection A → server A
+   ├── connection B → server B
+   └── connection C → server C
+```
+
+You're beginning to understand your machine's **network attack surface**.
+
+---
+
+# Step 6 — Watch packets in real time
+
+This is the experiment I'd especially recommend.
+
+Install/use `tcpdump`:
+
+```bash
+sudo tcpdump -i eth0
+```
+
+You'll start seeing packets.
+
+Stop with:
+
+```text
+Ctrl+C
+```
+
+Now try:
+
+```bash
+ping example.com
+```
+
+while `tcpdump` is running.
+
+You'll see traffic appearing.
+
+Congratulations—you've just started doing **packet analysis**.
+
+---
+
+# Step 7 — Make it readable
+
+Instead of everything, try:
+
+```bash
+sudo tcpdump -i eth0 -n
+```
+
+`-n` prevents DNS/name resolution, making the output easier to understand.
+
+Then:
+
+```bash
+ping 1.1.1.1
+```
+
+You'll see traffic involving:
+
+```text
+your IP → 1.1.1.1
+1.1.1.1 → your IP
+```
+
+Now you're looking at actual network packets rather than an abstract diagram.
+
+---
+
+# Step 8 — Here's the really cool experiment
+
+Open a terminal:
+
+```bash
+sudo tcpdump -i eth0 -n
+```
+
+Then open your browser and visit a website.
+
+Watch what happens.
+
+You'll see connections involving:
+
+```text
+your computer
+     ↓
+DNS / network infrastructure
+     ↓
+remote servers
+```
+
+You might see TCP:
+
+```text
+SYN
+SYN-ACK
+ACK
+```
+
+and then encrypted HTTPS traffic.
+
+This gives you a beautiful connection between concepts:
+
+```text
+Application
+    ↓
+HTTPS
+    ↓
+TCP
+    ↓
+IP
+    ↓
+Ethernet
+    ↓
+Network
+```
+
+---
+
+# Step 9 — Then ask the cybersecurity question
+
+Now imagine you see:
+
+```text
+192.168.1.42:53210
+        ↓
+203.x.x.x:443
+```
+
+You know:
+
+* `192.168.1.42` = your local IP
+* `53210` = ephemeral client port
+* `203.x.x.x` = remote IP
+* `443` = HTTPS
+* the traffic is encrypted
+
+Then ask:
+
+> **What can I actually learn from the packet if the contents are encrypted?**
+
+That's an excellent cybersecurity question.
+
+You can potentially observe things such as:
+
+```text
+source/destination IPs
+ports
+packet sizes
+timing
+protocol information
+connection patterns
+```
+
+but HTTPS is designed to prevent someone merely observing the packets from reading the HTTP contents.
+
+---
+
+# Your first mini cybersecurity investigation
+
+Try answering these questions using only your Ubuntu terminal:
+
+### Network
+
+```bash
+ip addr
+ip route
+```
+
+1. What's my local IP?
+2. What's my interface?
+3. What's my default gateway?
+
+### DNS
+
+```bash
+resolvectl status
+resolvectl query example.com
+```
+
+4. Which DNS resolver am I using?
+5. What IP does `example.com` resolve to?
+
+### Connections
+
+```bash
+ss -tunap
+```
+
+6. What programs currently have network connections?
+7. Which remote IPs are they communicating with?
+8. Which ports are involved?
+
+### Packets
+
+```bash
+sudo tcpdump -i eth0 -n
+```
+
+9. What happens when you run:
+
+```bash
+ping 1.1.1.1
+```
+
+10. What happens when you open a website?
+
+---
+
+**That is the direction I'd take you in rather than jumping straight into Kali Linux or "hacking tools."** You're learning how the underlying system actually works first. Once you understand these commands, tools like Wireshark, Nmap, and eventually exploit/CTF tooling become much easier to understand rather than just commands you're copying from tutorials.
