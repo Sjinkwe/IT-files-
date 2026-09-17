@@ -1,0 +1,91 @@
+Sure — here are the commands we used, grouped by purpose.
+
+### Install/check ADB on Ubuntu
+
+```bash
+sudo apt update
+sudo apt install android-tools-adb
+adb version
+```
+
+### Check connected devices
+
+```bash
+adb devices
+```
+
+### ADB shell / view accessible phone storage
+
+```bash
+adb shell
+ls /sdcard
+ls /sdcard/Download
+```
+
+### Copy a file from phone to PC
+
+```bash
+adb pull /sdcard/Download/example.txt .
+```
+
+### ADB over Wi-Fi
+
+These were for the case where USB debugging is already authorized:
+
+```bash
+adb tcpip 5555
+adb connect PHONE_IP:5555
+adb devices
+```
+
+### Find devices your PC knows about
+
+```bash
+ip neigh
+```
+
+### Ping your phone
+
+```bash
+ping 192.168.1.25
+```
+
+Or just four pings:
+
+```bash
+ping -c 4 192.168.1.25
+```
+
+Check the neighbor entry:
+
+```bash
+ip neigh show 192.168.1.25
+```
+
+### Scan your phone with Nmap
+
+Default 1,000 TCP ports:
+
+```bash
+nmap 192.168.1.25
+```
+
+Service/version detection:
+
+```bash
+nmap -sV 192.168.1.25
+```
+
+All TCP ports:
+
+```bash
+nmap -p- 192.168.1.25
+```
+
+Check a specific port:
+
+```bash
+nmap -sV -p PORT 192.168.1.25
+```
+
+**Important:** replace `192.168.1.25` with your phone's actual local IP if it changes. These commands are appropriate for devices you own or have permission to test.
