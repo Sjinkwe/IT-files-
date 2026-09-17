@@ -1,0 +1,170 @@
+### Linux commands — cheat sheet
+
+| Command / syntax                 | Function                                 |
+| -------------------------------- | ---------------------------------------- |
+| `pwd`                            | Show current directory                   |
+| `ls`                             | List files/directories                   |
+| `ls -la`                         | List all, including hidden, with details |
+| `cd DIR`                         | Enter directory                          |
+| `cd /PATH`                       | Enter absolute path                      |
+| `cd .`                           | Stay in current directory                |
+| `cd ..`                          | Go to parent directory                   |
+| `cd ~`                           | Go to home directory                     |
+| `mkdir DIR`                      | Create directory                         |
+| `mkdir -p A/B/C`                 | Create nested directories                |
+| `touch FILE`                     | Create empty file                        |
+| `cat FILE`                       | Display file contents                    |
+| `cp SRC DEST`                    | Copy file/directory                      |
+| `mv SRC DEST`                    | Move/rename                              |
+| `rm FILE`                        | Delete file                              |
+| `rm -r DIR`                      | Delete directory recursively             |
+| `rmdir DIR`                      | Delete empty directory                   |
+| `find PATH -name "NAME"`         | Find by name                             |
+| `find PATH -type f -name "NAME"` | Find files                               |
+| `find PATH -type d -name "NAME"` | Find directories                         |
+| `locate NAME`                    | Find using filename database             |
+| `command -v CMD`                 | Find executable used by shell            |
+| `echo "$PATH"`                   | Show executable search paths             |
+
+### Users
+
+| Command / syntax         | Function                            |
+| ------------------------ | ----------------------------------- |
+| `useradd -m USER`        | Create user + home directory        |
+| `usermod -aG GROUP USER` | Add user to group                   |
+| `usermod -s SHELL USER`  | Change login shell                  |
+| `userdel USER`           | Delete user                         |
+| `userdel -r USER`        | Delete user + home                  |
+| `passwd USER`            | Set/change password                 |
+| `passwd -l USER`         | Lock account                        |
+| `passwd -u USER`         | Unlock account                      |
+| `chage -l USER`          | Show password aging                 |
+| `chage -M DAYS USER`     | Set password expiration             |
+| `chage -d 0 USER`        | Force password change at next login |
+| `id USER`                | Show UID/GID/groups                 |
+| `groups USER`            | Show user's groups                  |
+
+### Groups
+
+| Command / syntax      | Function                  |
+| --------------------- | ------------------------- |
+| `groupadd GROUP`      | Create group              |
+| `groupmod -n NEW OLD` | Rename group              |
+| `groupdel GROUP`      | Delete group              |
+| `getent group GROUP`  | Display group information |
+
+### Important files
+
+```text
+/etc/passwd       → user account information
+/etc/shadow       → password/aging information
+/etc/group        → group information
+/etc/sudoers      → sudo configuration
+/etc/sudoers.d/   → sudo configuration snippets
+```
+
+### `/`, `./`, `../`, `.`
+
+```text
+/       → filesystem root
+./      → current directory
+../     → parent directory
+.       → current directory
+```
+
+Examples:
+
+```bash
+cd /etc              # absolute path
+cat ./file.txt       # file in current directory
+cd ../               # parent directory
+ls .                 # current directory
+find / -name foo     # search from root
+find . -name foo     # search from current directory
+./script.sh          # execute script in current directory
+```
+You start from **your current directory**, unless you give `mkdir` an absolute or different relative path.
+
+### 1. Create here
+
+```bash
+mkdir mydir
+```
+
+If:
+
+```bash
+pwd
+/home/alice
+```
+
+then you get:
+
+```text
+/home/alice/mydir
+```
+
+### 2. Create using an absolute path
+
+```bash
+mkdir /tmp/mydir
+```
+
+Creates:
+
+```text
+/tmp/mydir
+```
+
+`/` = start from filesystem root.
+
+### 3. Create in the parent directory
+
+```bash
+mkdir ../mydir
+```
+
+If you're in:
+
+```text
+/home/alice/project
+```
+
+it creates:
+
+```text
+/home/alice/mydir
+```
+
+`../` = go up one directory.
+
+### 4. Create inside a subdirectory
+
+```bash
+mkdir ./mydir
+```
+
+Same as:
+
+```bash
+mkdir mydir
+```
+
+`./` = current directory.
+
+### Simple rule
+
+```text
+mkdir NAME       → create here
+mkdir ./NAME     → create here
+mkdir ../NAME    → create one level up
+mkdir /PATH/NAME → create at this exact absolute location
+```
+
+**Always know where you are first:**
+
+```bash
+pwd
+```
+
+Then decide whether you want a **relative path** (`./`, `../`) or an **absolute path** (`/`).
